@@ -68,19 +68,16 @@ case "$raw_devices" in
         ;;
 esac
 
-# 解析 adb devices -l 的设备行：<serial>\t<state> ...
+# 解析 adb devices -l 的设备行：<serial>  <state> ...
+# 注意：实际输出以空格分隔，不能只按 tab 解析。
 device_table="$(
     printf '%s\n' "$raw_devices" |
         tr -d '\r' |
-        awk -F '\t' '
-            NF >= 2 {
-                serial = $1
-                state = $2
-                sub(/^[[:space:]]+/, "", state)
-                split(state, fields, /[[:space:]]+/)
-                if (serial != "" && fields[1] != "") {
-                    printf "%s\t%s\n", serial, fields[1]
-                }
+        awk '
+            /^List of devices attached[[:space:]]*$/ { next }
+            /^[[:space:]]*$/ { next }
+            NF >= 2 && $1 !~ /^\*/ {
+                printf "%s\t%s\n", $1, $2
             }
         '
 )"
