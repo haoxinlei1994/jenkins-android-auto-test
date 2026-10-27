@@ -26,8 +26,8 @@ pipeline {
 
     parameters {
         // 被测代码来源；留空时使用当前工作区
-        string(name: 'APP_GIT_URL', defaultValue: '', description: '被测 App 代码仓库地址；留空则不额外拉取')
-        string(name: 'APP_GIT_BRANCH', defaultValue: 'main', description: '被测代码分支、标签或提交')
+        string(name: 'APP_GIT_URL', defaultValue: 'https://github.com/haoxinlei1994/jenkins-android-auto-test.git', description: '被测 App 代码仓库地址；留空则不额外拉取')
+        string(name: 'APP_GIT_BRANCH', defaultValue: 'master', description: '被测代码分支、标签或提交')
         string(name: 'APP_GIT_CREDENTIALS_ID', defaultValue: '', description: 'Git 凭据 ID；公开仓库可留空')
 
         // 测试参数；留空时使用 config/test.yaml
