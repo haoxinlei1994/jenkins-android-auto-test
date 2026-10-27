@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# 在宿主机后台重启 ADB Server，并监听所有网络接口。
+# 在宿主机后台重启 ADB Server，并同步 Jenkins 镜像的 platform-tools 版本。
 #
 # 用途：
 #   Jenkins 容器通过 host.docker.internal:5037 连接宿主机 ADB Server。
@@ -11,9 +11,14 @@
 #   ADB_SERVER_LOG   日志文件，默认 /tmp/adb-server.log
 #   ADB_SERVER_PORT  ADB Server 端口，默认 5037
 #
+# 同时读取本机 adb 的 platform-tools 版本并写入项目根目录 .env，
+# 供 compose.yaml 构建 Jenkins 镜像使用，避免 ADB client/server 版本不一致。
+#
 # 注意：
 #   - 本脚本用于宿主机，不要在 Jenkins 容器内执行。
 #   - -a 会把 ADB 端口暴露到局域网，请仅在可信网络使用。
+#   - 版本写入 .env 后，需要重新构建镜像才会生效：
+#     docker compose up -d --build
 #
 # 返回码：
 #   0  启动成功
@@ -29,14 +34,68 @@ die() {
     exit 1
 }
 
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+repo_root="$(cd "${script_dir}/.." && pwd)"
+env_file="${repo_root}/.env"
+
+update_platform_tools_env() {
+    local version="$1"
+    local tmp_file
+
+    tmp_file="$(mktemp "${TMPDIR:-/tmp}/jenkins-android-env.XXXXXX")"
+    if [ -f "$env_file" ]; then
+        # 保留其它配置，只替换 PLATFORM_TOOLS_VERSION
+        awk -v version="$version" '
+            /^[[:space:]]*(export[[:space:]]+)?PLATFORM_TOOLS_VERSION[[:space:]]*=/ {
+                if (!updated) {
+                    print "PLATFORM_TOOLS_VERSION=" version
+                    updated = 1
+                }
+                next
+            }
+            { print }
+            END {
+                if (!updated) {
+                    print "PLATFORM_TOOLS_VERSION=" version
+                }
+            }
+        ' "$env_file" >"$tmp_file"
+    else
+        {
+            printf '# 由 scripts/restart_adb_server.sh 自动生成：与宿主机 adb 版本保持一致\n'
+            printf 'PLATFORM_TOOLS_VERSION=%s\n' "$version"
+        } >"$tmp_file"
+    fi
+    mv -f "$tmp_file" "$env_file"
+}
+
 command -v adb >/dev/null 2>&1 || die '未找到 adb 命令。'
 command -v lsof >/dev/null 2>&1 || die '未找到 lsof 命令。'
 command -v nohup >/dev/null 2>&1 || die '未找到 nohup 命令。'
 
 adb_path="$(command -v adb)"
 printf 'adb 路径: %s\n' "$adb_path"
+if ! adb_version_output="$("$adb_path" version 2>&1)"; then
+    die "执行 adb version 失败：${adb_version_output}"
+fi
 printf '%s\n' 'adb 版本:'
-"$adb_path" version
+printf '%s\n' "$adb_version_output"
+
+platform_tools_version="$(
+    printf '%s\n' "$adb_version_output" |
+        tr -d '\r' |
+        awk '/^Version / { version = $2; sub(/-.*/, "", version); print version; exit }'
+)"
+if [ -z "$platform_tools_version" ]; then
+    die '无法从 adb version 输出中解析 platform-tools 版本，请确认本机 adb 安装完整。'
+fi
+if ! printf '%s\n' "$platform_tools_version" |
+    grep -Eq '^[0-9]+(\.[0-9]+)+$'; then
+    die "解析出的 platform-tools 版本格式无效：${platform_tools_version}"
+fi
+
+update_platform_tools_env "$platform_tools_version"
+printf '已更新 %s: PLATFORM_TOOLS_VERSION=%s\n' "$env_file" "$platform_tools_version"
 
 listener_pids() {
     lsof -ti "tcp:${adb_server_port}" -sTCP:LISTEN 2>/dev/null || true
@@ -105,3 +164,5 @@ if ! printf '%s\n' "$listeners" |
 fi
 
 printf '完成。容器可通过 host.docker.internal:%s 连接。\n' "$adb_server_port"
+printf 'Jenkins 镜像构建版本已同步为 platform-tools %s。\n' "$platform_tools_version"
+printf '首次使用或宿主机 adb 版本变化后，请执行：docker compose up -d --build\n'

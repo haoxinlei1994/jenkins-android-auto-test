@@ -3,14 +3,15 @@
 # 说明：
 # - macOS 上的 Docker Desktop 无法直接透传 USB 设备，因此容器内只运行 adb 客户端，
 #   通过 ADB_SERVER_SOCKET 连接宿主机上监听 5037 端口的 ADB Server。
-# - 宿主机需先执行：adb -a nodaemon server
-# - 宿主机与容器内的 adb（platform-tools）版本应保持一致，避免 ADB Server 版本不匹配。
+# - 宿主机需先执行：bash scripts/restart_adb_server.sh
+# - 镜像内 platform-tools 版本由构建参数 PLATFORM_TOOLS_VERSION 指定，需与宿主机 adb 保持一致。
+#   宿主机执行 scripts/restart_adb_server.sh 会自动读取并写入项目根目录 .env。
 # - 官方 Linux platform-tools 仅提供 x86_64 包；Apple Silicon 上请使用
 #   `docker build --platform linux/amd64` 构建（通过模拟执行）。
 FROM jenkins/jenkins:2.580.1-lts-jdk21
 
 ARG TARGETARCH
-ARG PLATFORM_TOOLS_VERSION=37.0.1
+ARG PLATFORM_TOOLS_VERSION
 ARG ANDROID_SDK_ROOT=/opt/android-sdk
 
 USER root
@@ -19,7 +20,13 @@ USER root
 RUN if [ "${TARGETARCH}" != "amd64" ]; then \
         echo "ERROR: platform-tools Linux 包仅支持 x86_64，当前 TARGETARCH=${TARGETARCH}。请使用 --platform linux/amd64 构建。" >&2; \
         exit 1; \
-    fi
+    fi; \
+    case "${PLATFORM_TOOLS_VERSION}" in \
+        ''|*[!0-9.]*) \
+            echo "ERROR: 未设置有效的 PLATFORM_TOOLS_VERSION。请先在宿主机执行 bash scripts/restart_adb_server.sh，再执行 docker compose up -d --build。" >&2; \
+            exit 1; \
+            ;; \
+    esac
 
 ENV ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT}" \
     ANDROID_HOME="${ANDROID_SDK_ROOT}"

@@ -1,9 +1,9 @@
 # Jenkins + Android Monkey 自动化测试环境
 #
 # 启动前：
-#   1. 宿主机执行 adb -a nodaemon server
-#   2. 宿主机与容器内 adb（platform-tools）版本保持一致
-#   3. docker compose up -d --build
+#   1. 宿主机执行 bash scripts/restart_adb_server.sh
+#      脚本会读取本机 adb 版本并写入 .env，同时后台启动 ADB Server
+#   2. docker compose up -d --build
 #
 # Jenkins 地址：http://localhost:8080
 # 初始管理员密码：./jenkins_home/secrets/initialAdminPassword
@@ -18,8 +18,8 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        # 与宿主机 platform-tools 版本保持一致，可用环境变量覆盖
-        PLATFORM_TOOLS_VERSION: ${PLATFORM_TOOLS_VERSION:-37.0.1}
+        # 由 scripts/restart_adb_server.sh 按宿主机 adb 版本写入 .env
+        PLATFORM_TOOLS_VERSION: "${PLATFORM_TOOLS_VERSION:?请先在宿主机执行 bash scripts/restart_adb_server.sh}"
 
     image: jenkins-android-auto-test:dev
     container_name: jenkins-android-auto-test
