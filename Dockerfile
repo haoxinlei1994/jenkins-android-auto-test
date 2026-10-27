@@ -79,6 +79,9 @@ RUN if [ -s /usr/share/jenkins/ref/plugins.txt ] \
         jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt --latest=false; \
     fi
 
+# 首次启动时自动创建管理员账号；用户名和密码由 compose 环境变量传入
+COPY jenkins/init.groovy.d/ /usr/share/jenkins/ref/init.groovy.d/
+
 USER jenkins
 
 EXPOSE 8080 50000

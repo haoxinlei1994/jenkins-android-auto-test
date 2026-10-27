@@ -1,12 +1,12 @@
 # Jenkins + Android Monkey 自动化测试环境
 #
-# 启动前：
-#   1. 宿主机执行 bash scripts/restart_adb_server.sh
-#      脚本会读取本机 adb 版本并写入 .env，同时后台启动 ADB Server
-#   2. docker compose up -d --build
+# 启动：
+#   bash scripts/restart_adb_server.sh
+#
+# 脚本会同步本机 adb 版本、启动 ADB Server、构建并启动 Jenkins，
+# 首次运行还会生成管理员账号并把登录凭据写入 .env。
 #
 # Jenkins 地址：http://localhost:8080
-# 初始管理员密码：./jenkins_home/secrets/initialAdminPassword
 
 services:
   jenkins:
@@ -31,9 +31,12 @@ services:
 
     environment:
       TZ: Asia/Shanghai
-      JAVA_OPTS: "-Duser.timezone=Asia/Shanghai"
+      JAVA_OPTS: "-Duser.timezone=Asia/Shanghai -Djenkins.install.runSetupWizard=false"
       # 容器内只运行 adb 客户端，连接宿主机上的 ADB Server
       ADB_SERVER_SOCKET: "${ADB_SERVER_SOCKET:-tcp:host.docker.internal:5037}"
+      # 首次启动时由 init.groovy.d 创建管理员，已有安全域时自动跳过
+      JENKINS_ADMIN_USER: "${JENKINS_ADMIN_USER:-}"
+      JENKINS_ADMIN_PASSWORD: "${JENKINS_ADMIN_PASSWORD:-}"
 
     extra_hosts:
       # Docker Desktop 已内置 host.docker.internal；显式声明同时兼容 Linux
