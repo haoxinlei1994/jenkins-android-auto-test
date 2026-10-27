@@ -3,9 +3,9 @@
 # 说明：
 # - macOS 上的 Docker Desktop 无法直接透传 USB 设备，因此容器内只运行 adb 客户端，
 #   通过 ADB_SERVER_SOCKET 连接宿主机上监听 5037 端口的 ADB Server。
-# - 宿主机需先执行：bash scripts/restart_adb_server.sh
+# - 宿主机需先执行：bash scripts/start.sh
 # - 镜像内 platform-tools 版本由构建参数 PLATFORM_TOOLS_VERSION 指定，需与宿主机 adb 保持一致。
-#   宿主机执行 scripts/restart_adb_server.sh 会自动读取并写入项目根目录 .env。
+#   宿主机执行 scripts/start.sh 会自动读取并写入项目根目录 .env。
 # - 官方 Linux platform-tools 仅提供 x86_64 包；Apple Silicon 上请使用
 #   `docker build --platform linux/amd64` 构建（通过模拟执行）。
 FROM jenkins/jenkins:2.580.1-lts-jdk21
@@ -23,7 +23,7 @@ RUN if [ "${TARGETARCH}" != "amd64" ]; then \
     fi; \
     case "${PLATFORM_TOOLS_VERSION}" in \
         ''|*[!0-9.]*) \
-            echo "ERROR: 未设置有效的 PLATFORM_TOOLS_VERSION。请先在宿主机执行 bash scripts/restart_adb_server.sh，再执行 docker compose up -d --build。" >&2; \
+            echo "ERROR: 未设置有效的 PLATFORM_TOOLS_VERSION。请先在宿主机执行 bash scripts/start.sh（会自动同步 adb 版本并构建启动容器）。" >&2; \
             exit 1; \
             ;; \
     esac

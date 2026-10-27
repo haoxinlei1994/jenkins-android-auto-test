@@ -58,7 +58,7 @@ printf '%s\n' "$raw_devices" >&2
 # ADB client/server 版本不一致时立即失败，避免继续使用不可靠的 Server。
 case "$raw_devices" in
     *"doesn't match this client"*)
-        die "容器内 adb ${adb_client_version}（platform-tools ${adb_platform_tools_version}）与宿主机 ADB Server 版本不一致。请在宿主机执行 bash scripts/restart_adb_server.sh（自动读取本机 adb 版本并更新 .env），然后执行 docker compose up -d --build 重建 Jenkins 镜像。"
+        die "容器内 adb ${adb_client_version}（platform-tools ${adb_platform_tools_version}）与宿主机 ADB Server 版本不一致。请在宿主机执行 bash scripts/start.sh（会根据本机 adb 版本同步版本并重建 Jenkins），然后重新运行流水线。"
         ;;
 esac
 

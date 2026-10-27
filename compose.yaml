@@ -1,10 +1,10 @@
 # Jenkins + Android Monkey 自动化测试环境
 #
 # 启动：
-#   bash scripts/restart_adb_server.sh
+#   bash scripts/start.sh
 #
-# 脚本会同步本机 adb 版本、启动 ADB Server、构建并启动 Jenkins，
-# 首次运行还会生成管理员账号并把登录凭据写入 .env。
+# 脚本按步骤同步本机 adb 版本、准备管理员凭据、启动 ADB Server，
+# 再构建并启动 Jenkins，最后输出访问地址和登录信息。
 #
 # Jenkins 地址：http://localhost:8080
 
@@ -18,8 +18,8 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        # 由 scripts/restart_adb_server.sh 按宿主机 adb 版本写入 .env
-        PLATFORM_TOOLS_VERSION: "${PLATFORM_TOOLS_VERSION:?请先在宿主机执行 bash scripts/restart_adb_server.sh}"
+        # 由 scripts/start.sh 按宿主机 adb 版本写入 .env
+        PLATFORM_TOOLS_VERSION: "${PLATFORM_TOOLS_VERSION:?请先在宿主机执行 bash scripts/start.sh}"
 
     image: jenkins-android-auto-test:dev
     container_name: jenkins-android-auto-test
