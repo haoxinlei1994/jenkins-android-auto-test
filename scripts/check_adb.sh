@@ -4,7 +4,6 @@
 #
 # 输入环境变量：
 #   ADB_SERVER_SOCKET  必填，例如 tcp:host.docker.internal:5037
-#   REQUESTED_SERIAL   可选，指定设备序列号
 #
 # 输出约定：
 #   stdout  成功时只输出选中的设备序列号（一行）
@@ -41,10 +40,14 @@ printf '%s\n' "$adb_version" >&2
 raw_devices="$(adb devices -l 2>&1 || true)"
 printf '%s\n' "$raw_devices" >&2
 
+# ADB client/server 版本不一致时立即失败，避免继续使用不可靠的 Server。
 case "$raw_devices" in
     *"doesn't match this client"*)
         die '容器内 adb 与宿主机 ADB Server 版本不一致。请将宿主机 platform-tools 调整到与容器内相同的版本，然后重启 ADB Server。'
         ;;
+esac
+
+case "$raw_devices" in
     *"cannot connect to daemon"* | *"failed to connect"* | *"cannot start server on remote host"* | *"Connection refused"*)
         die "容器无法连接宿主机 ADB Server（${adb_server_socket}）。请在宿主机执行 adb kill-server，再执行 adb -a nodaemon server，并保持该终端运行。"
         ;;
@@ -94,72 +97,40 @@ format_devices() {
     printf '%s' "$output"
 }
 
-requested_serial="${REQUESTED_SERIAL:-}"
 target_serial=""
-target_state=""
+usable_count=0
+usable_list=""
+unauthorized_list=""
 
-if [ -n "$requested_serial" ]; then
-    for i in "${!device_serials[@]}"; do
-        if [ "${device_serials[$i]}" = "$requested_serial" ]; then
-            target_serial="${device_serials[$i]}"
-            target_state="${device_states[$i]}"
-            break
+for i in "${!device_serials[@]}"; do
+    serial="${device_serials[$i]}"
+    state="${device_states[$i]}"
+
+    if [ "$state" = "device" ]; then
+        usable_count=$((usable_count + 1))
+        if [ -n "$usable_list" ]; then
+            usable_list+=", "
         fi
-    done
-
-    if [ -z "$target_serial" ]; then
-        die "指定设备 ${requested_serial} 不存在。当前设备: $(format_devices)"
-    fi
-else
-    usable_count=0
-    usable_list=""
-    unauthorized_list=""
-
-    for i in "${!device_serials[@]}"; do
-        serial="${device_serials[$i]}"
-        state="${device_states[$i]}"
-
-        if [ "$state" = "device" ]; then
-            usable_count=$((usable_count + 1))
-            if [ -n "$usable_list" ]; then
-                usable_list+=", "
-            fi
-            usable_list+="$serial"
-            if [ "$usable_count" -eq 1 ]; then
-                target_serial="$serial"
-                target_state="$state"
-            fi
-        elif [ "$state" = "unauthorized" ]; then
-            if [ -n "$unauthorized_list" ]; then
-                unauthorized_list+=", "
-            fi
-            unauthorized_list+="$serial"
+        usable_list+="$serial"
+        if [ "$usable_count" -eq 1 ]; then
+            target_serial="$serial"
         fi
-    done
-
-    if [ "$usable_count" -eq 0 ]; then
+    elif [ "$state" = "unauthorized" ]; then
         if [ -n "$unauthorized_list" ]; then
-            die "设备未授权 USB 调试，请在手机上确认授权。当前设备: ${unauthorized_list}"
+            unauthorized_list+=", "
         fi
-        die "没有处于 device 状态的设备。当前设备: $(format_devices)"
-    elif [ "$usable_count" -gt 1 ]; then
-        die "检测到多台可用设备，请通过 DEVICE_SERIAL 参数指定。当前可用设备: ${usable_list}"
+        unauthorized_list+="$serial"
     fi
-fi
+done
 
-case "$target_state" in
-    unauthorized)
-        die "设备 ${target_serial} 未授权 USB 调试，请在手机上确认授权。"
-        ;;
-    offline)
-        die "设备 ${target_serial} 处于 offline 状态，请重新插拔 USB 或重启设备后重试。"
-        ;;
-    device)
-        ;;
-    *)
-        die "设备 ${target_serial} 当前状态为 ${target_state}，无法执行测试。"
-        ;;
-esac
+if [ "$usable_count" -eq 0 ]; then
+    if [ -n "$unauthorized_list" ]; then
+        die "设备未授权 USB 调试，请在手机上确认授权。当前设备: ${unauthorized_list}"
+    fi
+    die "没有处于 device 状态的设备。当前设备: $(format_devices)"
+elif [ "$usable_count" -gt 1 ]; then
+    die "检测到多台可用设备，请只保留一台设备后重试。当前可用设备: ${usable_list}"
+fi
 
 if ! device_state="$(adb -s "$target_serial" get-state 2>&1)"; then
     die "无法获取设备 ${target_serial} 的状态：${device_state}"
