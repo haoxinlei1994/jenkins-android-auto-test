@@ -1,0 +1,6 @@
+.git
+jenkins_home
+logs
+reports
+.env
+.DS_Store

@@ -1,0 +1,58 @@
+# Jenkins + Android Monkey 自动化测试环境
+#
+# 启动前：
+#   1. 宿主机执行 adb -a nodaemon server
+#   2. 宿主机与容器内 adb（platform-tools）版本保持一致
+#   3. docker compose up -d --build
+#
+# Jenkins 地址：http://localhost:8080
+# 初始管理员密码：./jenkins_home/secrets/initialAdminPassword
+
+services:
+  jenkins:
+    # Google 的 Linux platform-tools 仅提供 x86_64 版本；
+    # Apple Silicon 通过 Rosetta 模拟运行 amd64 镜像。
+    platform: linux/amd64
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # 与宿主机 platform-tools 版本保持一致，可用环境变量覆盖
+        PLATFORM_TOOLS_VERSION: ${PLATFORM_TOOLS_VERSION:-37.0.1}
+
+    image: jenkins-android-auto-test:dev
+    container_name: jenkins-android-auto-test
+    restart: unless-stopped
+
+    ports:
+      # 可用环境变量覆盖宿主机端口，例如 JENKINS_PORT=8081
+      - "${JENKINS_PORT:-8080}:8080"
+
+    environment:
+      TZ: Asia/Shanghai
+      JAVA_OPTS: "-Duser.timezone=Asia/Shanghai"
+      # 容器内只运行 adb 客户端，连接宿主机上的 ADB Server
+      ADB_SERVER_SOCKET: "${ADB_SERVER_SOCKET:-tcp:host.docker.internal:5037}"
+
+    extra_hosts:
+      # Docker Desktop 已内置 host.docker.internal；显式声明同时兼容 Linux
+      - "host.docker.internal:host-gateway"
+
+    volumes:
+      # 完整 Jenkins 数据目录：插件、凭据、任务、workspace、构建产物
+      # 宿主机路径：./jenkins_home/workspace/<任务名>
+      - ./jenkins_home:/var/jenkins_home
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/login > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

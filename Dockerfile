@@ -54,7 +54,7 @@ RUN set -eux; \
 COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
 RUN if [ -s /usr/share/jenkins/ref/plugins.txt ] \
         && grep -qEv '^[[:space:]]*(#|$)' /usr/share/jenkins/ref/plugins.txt; then \
-        jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt; \
+        jenkins-plugin-cli --plugin-file /usr/share/jenkins/ref/plugins.txt --latest=false; \
     fi
 
 USER jenkins
