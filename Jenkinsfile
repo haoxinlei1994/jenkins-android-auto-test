@@ -15,12 +15,10 @@
 // - 失败时返回非 0
 //
 // scripts/monkey_test.sh 约定：
-// - 参数：--config <配置文件>
-// - 环境变量：APK_PATH、APP_PACKAGE、DEVICE_SERIAL、MONKEY_EVENTS、
-//   MONKEY_THROTTLE_MS、MONKEY_SEED、LOG_DIR、REPORT_DIR
-// - 上述变量为空时，脚本回退到 config/test.yaml 中的配置
-// - 测试日志写入 LOG_DIR，测试报告写入 REPORT_DIR
-// - Monkey 失败或检测到崩溃/ANR 时返回非 0
+// - 直接修改脚本中的 app_package 和 Monkey 参数
+// - 应用需已安装在设备上
+// - 解锁屏幕、启动应用并执行 Monkey，不生成日志和测试报告
+// - Monkey 结束后直接返回其退出码
 
 pipeline {
     agent any
@@ -47,10 +45,17 @@ pipeline {
                         error('ADB 检查脚本没有返回设备序列号')
                     }
 
-                    env.DEVICE_SERIAL = serial
-                    env.ANDROID_SERIAL = serial
                     echo "使用设备: ${serial}"
                 }
+            }
+        }
+
+        stage('Monkey 测试') {
+            options {
+                timeout(time: 60, unit: 'MINUTES')
+            }
+            steps {
+                sh 'bash scripts/monkey_test.sh'
             }
         }
     }
