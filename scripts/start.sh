@@ -7,7 +7,7 @@
 #   2. generate_jenkins_credentials.sh 首次安装时生成管理员凭据
 #   3. restart_adb_server.sh           后台重启宿主机 ADB Server
 #   4. start_jenkins.sh                构建并启动 Jenkins 容器
-#   5. show_jenkins_credentials.sh     输出 Jenkins 地址和登录凭据
+#   5. show_jenkins_credentials.sh     输出 Jenkins 地址和 .env 中的登录凭据
 #
 # 各步骤共用 common.sh 中的变量和函数。
 # 使用 -a 让 ADB Server 监听所有网络接口；仅应在可信网络中使用。
