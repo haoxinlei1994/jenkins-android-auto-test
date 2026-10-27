@@ -20,3 +20,6 @@ sleep 3
 
 # Monkey 测试，按需修改事件数和 throttle
 adb shell monkey -p "$app_package" --throttle 30 1000
+
+# 关闭所有页面，dump 堆并检测内存泄漏
+bash scripts/memory_leak_test.sh "$app_package"

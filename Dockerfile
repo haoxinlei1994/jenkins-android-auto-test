@@ -50,6 +50,21 @@ RUN set -eux; \
     adb version; \
     git --version
 
+# 安装 Shark CLI（Square LeakCanary 的堆分析工具）
+ARG SHARK_CLI_VERSION=2.14
+ARG SHARK_CLI_SHA256=4a1022a4610fd6a4a1306b264f95985c4210e169e2bd4b0ad19bbdcc16d6beef
+RUN set -eux; \
+    curl -fsSL --retry 3 --retry-delay 2 \
+        "https://github.com/square/leakcanary/releases/download/v${SHARK_CLI_VERSION}/shark-cli-${SHARK_CLI_VERSION}.zip" \
+        -o /tmp/shark-cli.zip; \
+    echo "${SHARK_CLI_SHA256}  /tmp/shark-cli.zip" | sha256sum -c -; \
+    mkdir -p /opt/shark-cli; \
+    unzip -q /tmp/shark-cli.zip -d /opt/shark-cli; \
+    ln -s "/opt/shark-cli/shark-cli-${SHARK_CLI_VERSION}/bin/shark-cli" /usr/local/bin/shark-cli; \
+    chmod -R a+rX /opt/shark-cli; \
+    rm -f /tmp/shark-cli.zip; \
+    shark-cli --version
+
 # 安装固定版本的 Jenkins 插件；plugins.txt 为空或只有注释时跳过
 COPY plugins.txt /usr/share/jenkins/ref/plugins.txt
 RUN if [ -s /usr/share/jenkins/ref/plugins.txt ] \

@@ -2,7 +2,7 @@
 //
 // 前置条件：
 // 1. Jenkins 任务使用 “Pipeline script from SCM” 加载本仓库；工作区根目录即项目根目录，
-//    包含 Jenkinsfile、scripts/ 和 config/，无需在流水线内重复拉取。
+//    包含 Jenkinsfile 和 scripts/，无需在流水线内重复拉取。
 // 2. Jenkins 镜像内已安装 adb 与 git，且 ADB_SERVER_SOCKET 指向宿主机 ADB Server
 //    （默认 tcp:host.docker.internal:5037）。
 // 3. 宿主机已执行：adb -a nodaemon server
@@ -17,8 +17,13 @@
 // scripts/monkey_test.sh 约定：
 // - 直接修改脚本中的 app_package 和 Monkey 参数
 // - 应用需已安装在设备上
-// - 解锁屏幕、启动应用并执行 Monkey，不生成日志和测试报告
-// - Monkey 结束后直接返回其退出码
+// - 解锁屏幕、启动应用并执行 Monkey
+// - Monkey 结束后调用 scripts/memory_leak_test.sh 检测内存泄漏
+//
+// scripts/memory_leak_test.sh 约定：
+// - 关闭 App 页面并返回桌面，确认 App 进程仍在运行
+// - dump Java 堆并使用 Square Shark 分析
+// - 检测到内存泄漏时生成 reports/memory-leak-report.md
 
 pipeline {
     agent any
@@ -30,11 +35,14 @@ pipeline {
     }
 
     stages {
-        stage('检查 ADB 连接') {
+        stage('准备并检查 ADB 连接') {
             options {
                 timeout(time: 5, unit: 'MINUTES')
             }
             steps {
+                // 清理上一次构建遗留的报告，避免本次失败时误归档旧报告
+                sh 'rm -f reports/memory-leak-report.md'
+
                 script {
                     def serial = sh(
                         script: 'bash scripts/check_adb.sh',
@@ -50,13 +58,19 @@ pipeline {
             }
         }
 
-        stage('Monkey 测试') {
+        stage('Monkey 与内存泄漏测试') {
             options {
                 timeout(time: 60, unit: 'MINUTES')
             }
             steps {
                 sh 'bash scripts/monkey_test.sh'
             }
+        }
+    }
+
+    post {
+        always {
+            archiveArtifacts artifacts: 'reports/memory-leak-report.md', allowEmptyArchive: true
         }
     }
 }
