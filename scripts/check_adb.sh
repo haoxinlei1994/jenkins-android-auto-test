@@ -37,13 +37,28 @@ if ! adb_version="$(adb version 2>&1)"; then
 fi
 printf '%s\n' "$adb_version" >&2
 
+adb_client_version="$(
+    printf '%s\n' "$adb_version" |
+        awk '/^Android Debug Bridge version / { print $NF; exit }'
+)"
+adb_platform_tools_version="$(
+    printf '%s\n' "$adb_version" |
+        awk '/^Version / { version = $2; sub(/-.*/, "", version); print version; exit }'
+)"
+if [ -z "$adb_client_version" ]; then
+    adb_client_version='未知'
+fi
+if [ -z "$adb_platform_tools_version" ]; then
+    adb_platform_tools_version='未知'
+fi
+
 raw_devices="$(adb devices -l 2>&1 || true)"
 printf '%s\n' "$raw_devices" >&2
 
 # ADB client/server 版本不一致时立即失败，避免继续使用不可靠的 Server。
 case "$raw_devices" in
     *"doesn't match this client"*)
-        die '容器内 adb 与宿主机 ADB Server 版本不一致。请将宿主机 platform-tools 调整到与容器内相同的版本，然后重启 ADB Server。'
+        die "容器内 adb ${adb_client_version}（platform-tools ${adb_platform_tools_version}）与宿主机 ADB Server 版本不一致。原因：ADB client 与 ADB Server 必须使用相同版本的 platform-tools。请将宿主机 platform-tools 升级到 ${adb_platform_tools_version}（adb ${adb_client_version}），然后执行 adb kill-server，再重新执行 adb -a nodaemon server。"
         ;;
 esac
 
