@@ -12,6 +12,6 @@
 
 4、浏览器打开 http://localhost:8080/,  输入用户名和密码进入jenkins服务后台
 
-6、新建Build选择Pipeline模式，选择Pipeline script from SCM，仓库地址填写自己fork的仓库，分支master，一定要取消勾选Lightweight checkout，保存
+5、新建Build选择Pipeline模式，选择Pipeline script from SCM，仓库地址填写自己fork的仓库，分支master，一定要取消勾选Lightweight checkout，保存
 
-7、点击Build开始跑任务
+6、点击Build开始跑任务
